@@ -1,95 +1,89 @@
-import argparse
-import os
 import torch
-from torch import optim
-
 from utils import set_seed, get_device
 from dataset import create_dataloaders, print_dataset_info
-from model import get_model
-from train import train_model
+from model import get_model, print_model_info
+from train import train_model, create_medical_optimizer_scheduler
 from evaluate import evaluate_multi_label, print_evaluation_results
+
+# ========== CONFIG FOR MEDICAL FEATURE EXTRACTION ==========
+CSV_PATH = '/kaggle/input/mimic-cxr/mimic-cxr.csv'
+BASE_PATH = '/kaggle/input/mimic-cxr'
+MODEL_NAME = 'resnet152'
+BATCH_SIZE = 32         # Nhỏ hơn vì fine-tune toàn bộ mô hình (cần nhiều GPU memory)
+NUM_WORKERS = 2
+NUM_EPOCHS = 100        # Nhiều epochs hơn cho medical feature learning
+PATIENCE = 15           # Patience cao hơn cho medical data
+LEARNING_RATE = 1e-5    # LR thấp cho fine-tuning toàn bộ mô hình 
+GRAD_CLIP = 1.0         # Gradient clipping để tránh exploding gradients
+SEED = 42
+SAVE_PATH = '/kaggle/working/best_medical_resnet152.pth'
+EVAL_ONLY = False       # Set True nếu chỉ muốn evaluate
+# ===========================================================
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Lung X-ray Multi-label Classification')
-    parser.add_argument('--csv_path', type=str, default='/kaggle/input/mimic-cxr/mimic-cxr.csv',
-                        help='Path to CSV file')
-    parser.add_argument('--base_path', type=str, default='/kaggle/input/mimic-cxr',
-                        help='Base path to images')
-    parser.add_argument('--model_name', type=str, default='resnet152',
-                        choices=['resnet50', 'resnet101', 'resnet152'],
-                        help='Model architecture to use')
-    parser.add_argument('--batch_size', type=int, default=64,
-                        help='Batch size for training')
-    parser.add_argument('--num_workers', type=int, default=2,
-                        help='Number of workers for data loading')
-    parser.add_argument('--num_epochs', type=int, default=50,
-                        help='Maximum number of epochs')
-    parser.add_argument('--patience', type=int, default=7,
-                        help='Early stopping patience')
-    parser.add_argument('--lr', type=float, default=1e-4,
-                        help='Learning rate')
-    parser.add_argument('--seed', type=int, default=42,
-                        help='Random seed')
-    parser.add_argument('--save_path', type=str, default='best_model.pth',
-                        help='Path to save best model')
-    parser.add_argument('--eval_only', action='store_true',
-                        help='Only evaluate, skip training')
-    
-    args = parser.parse_args()
+    print("🏥 MEDICAL FEATURE EXTRACTION WITH RESNET152")
+    print("🎯 Goal: Fine-tune entire ResNet152 to learn medical-specific features")
     
     # Set random seed
-    set_seed(args.seed)
+    set_seed(SEED)
     
     # Get device
     device = get_device()
     
     # Create data loaders
-    print("Creating data loaders...")
+    print("📊 Creating data loaders...")
     train_loader, val_loader, test_loader, label_cols = create_dataloaders(
-        csv_path=args.csv_path,
-        base_path=args.base_path,
-        batch_size=args.batch_size,
-        num_workers=args.num_workers
+        csv_path=CSV_PATH,
+        base_path=BASE_PATH,
+        batch_size=BATCH_SIZE,
+        num_workers=NUM_WORKERS
     )
     
     print_dataset_info(train_loader, val_loader, test_loader)
     print(f"Number of classes: {len(label_cols)}")
     print(f"Classes: {label_cols}")
     
-    # Create model
-    print(f"Creating {args.model_name} model...")
-    model = get_model(num_classes=len(label_cols), model_name=args.model_name)
+    # Create model for medical feature extraction
+    print(f"🏥 Creating {MODEL_NAME} for medical feature extraction...")
+    model = get_model(num_classes=len(label_cols), model_name=MODEL_NAME)
     model = model.to(device)
     
-    if not args.eval_only:
-        # Create optimizer
-        optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    # Print model information
+    print_model_info(model)
+    
+    if not EVAL_ONLY:
+        # Create optimizer và scheduler cho medical fine-tuning
+        optimizer, scheduler = create_medical_optimizer_scheduler(model, lr=LEARNING_RATE)
         
-        # Train model
-        print("Starting training...")
+        # Train model để học medical-specific features
+        print("🚀 Starting medical feature extraction training...")
+        print("💡 This will fine-tune the ENTIRE ResNet152 for medical images")
         model, history = train_model(
             model=model,
             train_loader=train_loader,
             val_loader=val_loader,
             optimizer=optimizer,
+            scheduler=scheduler,
             device=device,
-            num_epochs=args.num_epochs,
-            patience=args.patience,
-            save_path=args.save_path
+            num_epochs=NUM_EPOCHS,
+            patience=PATIENCE,
+            save_path=SAVE_PATH,
+            grad_clip=GRAD_CLIP
         )
         
-        print("Training completed!")
+        print("✅ Medical feature extraction training completed!")
     else:
         # Load pre-trained model
-        if os.path.exists(args.save_path):
-            print(f"Loading model from {args.save_path}")
-            model.load_state_dict(torch.load(args.save_path, map_location=device))
+        import os
+        if os.path.exists(SAVE_PATH):
+            print(f"📂 Loading model from {SAVE_PATH}")
+            model.load_state_dict(torch.load(SAVE_PATH, map_location=device))
         else:
-            print(f"Warning: Model file {args.save_path} not found. Using untrained model.")
+            print(f"⚠️ Warning: Model file {SAVE_PATH} not found. Using untrained model.")
     
     # Evaluate on test set
-    print("Evaluating on test set...")
+    print("🔬 Evaluating medical feature extraction on test set...")
     test_metrics = evaluate_multi_label(
         model=model,
         dataloader=test_loader,
@@ -101,6 +95,7 @@ def main():
     
     # Print results
     print_evaluation_results(test_metrics, label_cols)
+    print(f"💾 Model saved at: {SAVE_PATH}")
 
 
 if __name__ == "__main__":

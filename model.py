@@ -4,7 +4,8 @@ import torch.nn as nn
 
 def get_model(num_classes, model_name='resnet152'):
     """
-    Create model with specified architecture
+    Create model optimized for medical feature extraction
+    Fine-tune entire ResNet152 to learn medical-specific features
     
     Args:
         num_classes: Number of output classes
@@ -19,14 +20,37 @@ def get_model(num_classes, model_name='resnet152'):
     else:
         raise ValueError(f"Unsupported model: {model_name}")
     
-    in_features = model.fc.in_features
+    # QUAN TRỌNG: Toàn bộ mô hình sẽ được fine-tune cho medical images
+    # Không freeze bất kỳ layer nào để học medical-specific features
+    
+    in_features = model.fc.in_features  # ResNet152: 2048
 
-    # Replace the final fully connected layer
+    # Thay thế classifier head với architecture phù hợp cho medical imaging
     model.fc = nn.Sequential(
-        nn.Linear(in_features, 512),
+        nn.Dropout(0.2),
+        nn.Linear(in_features, 1024),
         nn.ReLU(),
+        nn.BatchNorm1d(1024),
         nn.Dropout(0.3),
+        nn.Linear(1024, 512),
+        nn.ReLU(),
+        nn.BatchNorm1d(512),
+        nn.Dropout(0.2),
         nn.Linear(512, num_classes),
-        # nn.Sigmoid()  # multi-label classification - applied in loss function
+        # Sigmoid sẽ được áp dụng trong BCEWithLogitsLoss
     )
+    
+    print(f"✅ Created {model_name} for medical feature extraction")
+    print("🔥 Entire model will be fine-tuned for medical images")
+    
     return model
+
+
+def print_model_info(model):
+    """Print model information"""
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    
+    print(f"📊 Total parameters: {total_params:,}")
+    print(f"🎯 Trainable parameters: {trainable_params:,}")
+    print(f"🔥 All parameters are trainable for medical feature learning")

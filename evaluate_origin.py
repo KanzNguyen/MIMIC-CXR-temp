@@ -12,36 +12,7 @@ from sklearn.metrics import (
 from tqdm import tqdm
 
 
-def find_best_thresholds_per_class(y_true, y_probs, step=0.05):
-    """
-    Tìm threshold tốt nhất cho từng nhãn dựa trên F1-score macro
-    Args:
-        y_true: ndarray [N, C]
-        y_probs: ndarray [N, C]
-        step: bước nhảy threshold
-    Returns:
-        best_thresholds: ndarray [C]
-    """
-    n_classes = y_true.shape[1]
-    best_thresholds = np.zeros(n_classes)
-    for c in range(n_classes):
-        best_f1 = 0.0
-        best_t = 0.5
-        for t in np.arange(0.05, 0.95, step):
-            y_pred = (y_probs[:, c] > t).astype(float)
-            f1 = f1_score(y_true[:, c], y_pred, zero_division=0)
-            if f1 > best_f1:
-                best_f1 = f1
-                best_t = t
-        best_thresholds[c] = best_t
-    return best_thresholds
-
-
-def evaluate_multi_label(model, dataloader, device, label_names, init_threshold=0.2, tune_threshold=True, per_class_threshold=True):
-    """
-    Comprehensive evaluation for multi-label classification
-    Nếu per_class_threshold=True, tìm threshold tốt nhất cho từng nhãn dựa trên F1-score
-    """
+def evaluate_pretrained(model, dataloader, device, label_names, init_threshold=0.2, tune_threshold=True):
     model.eval()
     loss_fn = nn.BCEWithLogitsLoss()
     all_logits = []
@@ -49,7 +20,7 @@ def evaluate_multi_label(model, dataloader, device, label_names, init_threshold=
     total_loss = 0.0
 
     with torch.no_grad():
-        for images, labels in tqdm(dataloader, desc="Evaluating test set", leave=True):
+        for images, labels in tqdm(dataloader, desc="Evaluating pretrained model", leave=True):
             images = images.to(device)
             labels = labels.to(device)
             outputs = model(images)  # raw logits
@@ -64,16 +35,18 @@ def evaluate_multi_label(model, dataloader, device, label_names, init_threshold=
     all_probs = torch.sigmoid(all_logits).numpy()      # probabilities
     y_true = all_labels.numpy()                        # ground truth
 
-    # Tìm threshold tốt nhất cho từng nhãn
-    if tune_threshold and per_class_threshold:
-        best_thresholds = find_best_thresholds_per_class(y_true, all_probs)
-    else:
-        best_thresholds = np.full(y_true.shape[1], init_threshold)
+    # Find best threshold if requested
+    best_threshold = init_threshold
+    if tune_threshold:
+        best_f1 = 0.0
+        for t in np.arange(0.05, 0.95, 0.05):
+            y_pred_t = (all_probs > t).astype(float)
+            f1_t = f1_score(y_true, y_pred_t, average="macro", zero_division=0)
+            if f1_t > best_f1:
+                best_f1 = f1_t
+                best_threshold = t
 
-    # Dự đoán với threshold tốt nhất cho từng nhãn
-    y_pred = np.zeros_like(all_probs)
-    for c in range(all_probs.shape[1]):
-        y_pred[:, c] = (all_probs[:, c] > best_thresholds[c]).astype(float)
+    y_pred = (all_probs > best_threshold).astype(float)
 
     # Calculate metrics
     f1_macro = f1_score(y_true, y_pred, average="macro", zero_division=0)
@@ -98,7 +71,7 @@ def evaluate_multi_label(model, dataloader, device, label_names, init_threshold=
 
     results = {
         "loss": total_loss / len(dataloader),
-        "thresholds": best_thresholds,
+        "threshold_used": best_threshold,
         "f1_macro": f1_macro,
         "f1_micro": f1_micro,
         "precision_macro": precision_macro,
@@ -110,15 +83,15 @@ def evaluate_multi_label(model, dataloader, device, label_names, init_threshold=
     return results
 
 
-def print_evaluation_results(test_metrics, label_cols):
-    """Print evaluation results in a formatted way"""
-    print(f"Test Loss: {test_metrics['loss']:.4f}")
-    print(f"Per-class thresholds: {np.round(test_metrics['thresholds'], 3)}")
-    print(f"Macro F1: {test_metrics['f1_macro']:.4f}, Micro F1: {test_metrics['f1_micro']:.4f}")
-    print(f"Precision (macro): {test_metrics['precision_macro']:.4f}, Recall (macro): {test_metrics['recall_macro']:.4f}")
-    print(f"Hamming Loss: {test_metrics['hamming_loss']:.4f}, AUC (macro): {test_metrics['auc_macro']:.4f}")
+def print_evaluation_results_origin(test_metrics, label_cols):
+    """Print evaluation results for pretrained model in a formatted way"""
+    print(f"[PRETRAINED] Test Loss: {test_metrics['loss']:.4f}")
+    print(f"[PRETRAINED] Threshold used: {test_metrics['threshold_used']:.2f}")
+    print(f"[PRETRAINED] Macro F1: {test_metrics['f1_macro']:.4f}, Micro F1: {test_metrics['f1_micro']:.4f}")
+    print(f"[PRETRAINED] Precision (macro): {test_metrics['precision_macro']:.4f}, Recall (macro): {test_metrics['recall_macro']:.4f}")
+    print(f"[PRETRAINED] Hamming Loss: {test_metrics['hamming_loss']:.4f}, AUC (macro): {test_metrics['auc_macro']:.4f}")
 
-    print("\nPer-class breakdown:")
+    print("\n[PRETRAINED] Per-class breakdown:")
     for cls in label_cols:
         cls_metrics = test_metrics["per_class"].get(cls, {})
         f1 = cls_metrics.get("f1", 0.0)
