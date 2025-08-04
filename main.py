@@ -9,15 +9,15 @@ from evaluate import evaluate_multi_label, print_evaluation_results
 CSV_PATH = '/kaggle/input/mimic-cxr/mimic-cxr.csv'
 BASE_PATH = '/kaggle/input/mimic-cxr'
 MODEL_NAME = 'resnet152'
-BATCH_SIZE = 32         # Nhỏ hơn vì fine-tune toàn bộ mô hình (cần nhiều GPU memory)
+BATCH_SIZE = 64         
 NUM_WORKERS = 2
-NUM_EPOCHS = 100        # Nhiều epochs hơn cho medical feature learning
-PATIENCE = 15           # Patience cao hơn cho medical data
-LEARNING_RATE = 1e-5    # LR thấp cho fine-tuning toàn bộ mô hình 
+NUM_EPOCHS = 5        
+PATIENCE = 2          
+LEARNING_RATE = 1e-5    
 GRAD_CLIP = 1.0         # Gradient clipping để tránh exploding gradients
 SEED = 42
 SAVE_PATH = '/kaggle/working/best_medical_resnet152.pth'
-EVAL_ONLY = False       # Set True nếu chỉ muốn evaluate
+EVAL_ONLY = False      
 # ===========================================================
 
 
