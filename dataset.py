@@ -51,6 +51,25 @@ def create_dataloaders(csv_path, base_path, batch_size=64, num_workers=2):
     train_df = df[df['split'] == 'train']
     val_df = df[df['split'] == 'valid']
     test_df = df[df['split'] == 'test']
+
+    # Debug: print sample image paths and unique folders for each split
+    print("\n========== DATA FOLDER DEBUG ==========")
+    if not train_df.empty:
+        print("Sample train image path:", train_df['image_path'].iloc[0])
+        print("Train folders:", train_df['image_path'].apply(lambda x: '/'.join(x.split('/')[:-1])).unique())
+    else:
+        print("No train data found!")
+    if not val_df.empty:
+        print("Sample val image path:", val_df['image_path'].iloc[0])
+        print("Val folders:", val_df['image_path'].apply(lambda x: '/'.join(x.split('/')[:-1])).unique())
+    else:
+        print("No val data found!")
+    if not test_df.empty:
+        print("Sample test image path:", test_df['image_path'].iloc[0])
+        print("Test folders:", test_df['image_path'].apply(lambda x: '/'.join(x.split('/')[:-1])).unique())
+    else:
+        print("No test data found!")
+    print("=======================================\n")
     
     # Get transforms
     transform = get_transforms()
