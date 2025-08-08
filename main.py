@@ -7,7 +7,7 @@ from evaluate import evaluate_multi_label, print_evaluation_results
 
 # ========== CONFIG FOR MEDICAL FEATURE EXTRACTION ==========
 CSV_PATH = '/kaggle/input/mimic-cxr/mimic-cxr.csv'
-BASE_PATH = '/kaggle/input/preprocessed'
+BASE_PATH = '/kaggle/input/weighted'
 MODEL_NAME = 'resnet152'
 BATCH_SIZE = 64         
 NUM_WORKERS = 2
