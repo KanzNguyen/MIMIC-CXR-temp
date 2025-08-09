@@ -4,9 +4,9 @@ from dataset import create_dataloaders, print_dataset_info
 from model import get_model, print_model_info
 from train import train_model, create_medical_optimizer_scheduler
 from evaluate import evaluate_multi_label, print_evaluation_results
+import argparse
 
 # ========== CONFIG FOR MEDICAL FEATURE EXTRACTION ==========
-CSV_PATH = '/kaggle/input/mimic-cxr/mimic-cxr.csv'
 BASE_PATH = '/kaggle/input/increased-generations'
 MODEL_NAME = 'resnet152'
 BATCH_SIZE = 64         
@@ -22,8 +22,13 @@ EVAL_ONLY = False
 
 
 def main():
-    print("🏥 MEDICAL FEATURE EXTRACTION WITH RESNET152")
-    print("🎯 Goal: Fine-tune entire ResNet152 to learn medical-specific features")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--base_path', type=str, default=BASE_PATH, help='Path to image base directory')
+    args = parser.parse_args()
+    base_path = args.base_path
+    csv_path = base_path.rstrip('/\\') + '/mimic-cxr.csv'
+    print("\U0001F3E5 MEDICAL FEATURE EXTRACTION WITH RESNET152")
+    print("\U0001F3AF Goal: Fine-tune entire ResNet152 to learn medical-specific features")
     
     # Set random seed
     set_seed(SEED)
@@ -32,10 +37,10 @@ def main():
     device = get_device()
     
     # Create data loaders
-    print("📊 Creating data loaders...")
+    print("\U0001F4CA Creating data loaders...")
     train_loader, val_loader, test_loader, label_cols = create_dataloaders(
-        csv_path=CSV_PATH,
-        base_path=BASE_PATH,
+        csv_path=csv_path,
+        base_path=base_path,
         batch_size=BATCH_SIZE,
         num_workers=NUM_WORKERS
     )
