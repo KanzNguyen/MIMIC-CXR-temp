@@ -10,7 +10,7 @@ def train_one_epoch(model, dataloader, optimizer, device):
     """Train model for one epoch"""
     model.train()
     total_loss = 0
-    loss_fn = nn.BCEWithLogitsLoss()
+    loss_fn = nn.BCEWithLogitsLoss().to(device)
 
     pbar = tqdm(dataloader, desc="Training", leave=True)
     
@@ -35,7 +35,7 @@ def evaluate(model, dataloader, device, threshold=0.2, loss_fn=None, return_prob
     all_labels = []
     all_preds = []
 
-    loss_fn = loss_fn or nn.BCEWithLogitsLoss()
+    loss_fn = (loss_fn or nn.BCEWithLogitsLoss()).to(device)
     pbar = tqdm(dataloader, desc="Validating", leave=True)
 
     with torch.no_grad():
@@ -166,7 +166,7 @@ def train_one_epoch_with_clip(model, dataloader, optimizer, device, grad_clip=1.
     """Train one epoch with gradient clipping"""
     model.train()
     total_loss = 0
-    loss_fn = loss_fn or nn.BCEWithLogitsLoss()
+    loss_fn = (loss_fn or nn.BCEWithLogitsLoss()).to(device)
 
     pbar = tqdm(dataloader, desc="Training", leave=True)
     
