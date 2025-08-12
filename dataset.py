@@ -79,12 +79,19 @@ def create_dataloaders(csv_path, base_path, batch_size=64, num_workers=2):
     val_dataset = LungXrayDataset(val_df, label_cols, transform)
     test_dataset = LungXrayDataset(test_df, label_cols, transform)
     
+    # Compute class imbalance weights (pos_weight for BCEWithLogitsLoss)
+    num_train = len(train_df)
+    # Avoid division by zero; cast to float32 tensor
+    pos_counts = train_df[label_cols].sum().values.astype('float32') if num_train > 0 else np.ones(len(label_cols), dtype='float32')
+    neg_counts = (num_train - pos_counts).astype('float32') if num_train > 0 else np.ones(len(label_cols), dtype='float32')
+    pos_weight = torch.tensor(neg_counts / (pos_counts + 1e-6), dtype=torch.float32)
+
     # Create dataloaders
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
     
-    return train_loader, val_loader, test_loader, label_cols
+    return train_loader, val_loader, test_loader, label_cols, pos_weight
 
 
 def print_dataset_info(train_loader, val_loader, test_loader):

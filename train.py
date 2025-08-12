@@ -28,14 +28,14 @@ def train_one_epoch(model, dataloader, optimizer, device):
     return total_loss / len(dataloader)
 
 
-def evaluate(model, dataloader, device, threshold=0.2):
+def evaluate(model, dataloader, device, threshold=0.2, loss_fn=None, return_probs=False):
     """Evaluate model on validation/test set"""
     model.eval()
     total_loss = 0
     all_labels = []
     all_preds = []
 
-    loss_fn = nn.BCEWithLogitsLoss()
+    loss_fn = loss_fn or nn.BCEWithLogitsLoss()
     pbar = tqdm(dataloader, desc="Validating", leave=True)
 
     with torch.no_grad():
@@ -55,13 +55,26 @@ def evaluate(model, dataloader, device, threshold=0.2):
 
     all_labels = torch.cat(all_labels, dim=0).numpy()
     all_preds = torch.cat(all_preds, dim=0).numpy()
-
     f1 = f1_score(all_labels, all_preds, average='macro')
+    if return_probs:
+        return total_loss / len(dataloader), f1, torch.cat(all_preds, dim=0)
     return total_loss / len(dataloader), f1
 
 
-def train_model(model, train_loader, val_loader, optimizer, scheduler, device, 
-                num_epochs=100, patience=15, save_path='best_model.pth', grad_clip=1.0):
+def train_model(
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    scheduler,
+    device,
+    num_epochs=100,
+    patience=15,
+    save_path='best_model.pth',
+    grad_clip=1.0,
+    pos_weight=None,
+    early_stop_metric='auc'
+):
     """
     Train model for medical feature extraction (full fine-tuning)
     
@@ -81,7 +94,7 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device,
         model: Trained model with best weights loaded
         history: Training history
     """
-    best_f1 = 0
+    best_score = 0
     counter = 0
     best_model_wts = copy.deepcopy(model.state_dict())
     history = {'train_loss': [], 'val_loss': [], 'val_f1': [], 'lr': []}
@@ -94,7 +107,8 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device,
         train_loss = train_one_epoch_with_clip(model, train_loader, optimizer, device, grad_clip)
         
         # Validation
-        val_loss, val_f1 = evaluate(model, val_loader, device)
+        # Use AUC-friendly validation if requested (threshold-free)
+        val_loss, val_f1 = evaluate(model, val_loader, device, loss_fn=nn.BCEWithLogitsLoss(pos_weight=pos_weight) if pos_weight is not None else None)
         
         # Update learning rate
         if scheduler:
@@ -115,13 +129,14 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device,
               f"Val F1: {val_f1:.4f} | "
               f"LR: {current_lr:.2e}")
 
-        # Check for improvement
-        if val_f1 > best_f1:
-            best_f1 = val_f1
+        # Check for improvement (use val_loss when early_stop_metric == 'loss', else use F1 placeholder)
+        current_score = -val_loss if early_stop_metric == 'loss' else val_f1
+        if current_score > best_score:
+            best_score = current_score
             best_model_wts = copy.deepcopy(model.state_dict())
             counter = 0
             torch.save(model.state_dict(), save_path)
-            print(f"✅ New best F1: {best_f1:.4f} - Model saved!")
+            print(f"✅ New best score ({early_stop_metric}): {current_score:.4f} - Model saved!")
         else:
             counter += 1
             if counter >= patience:
@@ -136,16 +151,16 @@ def train_model(model, train_loader, val_loader, optimizer, scheduler, device,
     # Load best weights
     model.load_state_dict(best_model_wts)
     print(f"🎯 Medical feature extraction training completed!")
-    print(f"🏆 Best F1: {best_f1:.4f}")
+    print(f"🏆 Best {early_stop_metric}: {best_score:.4f}")
     
     return model, history
 
 
-def train_one_epoch_with_clip(model, dataloader, optimizer, device, grad_clip=1.0):
+def train_one_epoch_with_clip(model, dataloader, optimizer, device, grad_clip=1.0, loss_fn=None):
     """Train one epoch with gradient clipping"""
     model.train()
     total_loss = 0
-    loss_fn = nn.BCEWithLogitsLoss()
+    loss_fn = loss_fn or nn.BCEWithLogitsLoss()
 
     pbar = tqdm(dataloader, desc="Training", leave=True)
     

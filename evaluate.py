@@ -37,7 +37,16 @@ def find_best_thresholds_per_class(y_true, y_probs, step=0.05):
     return best_thresholds
 
 
-def evaluate_multi_label(model, dataloader, device, label_names, init_threshold=0.2, tune_threshold=True, per_class_threshold=True):
+def evaluate_multi_label(
+    model,
+    dataloader,
+    device,
+    label_names,
+    init_threshold=0.2,
+    tune_threshold=True,
+    per_class_threshold=True,
+    thresholds=None,
+):
     """
     Comprehensive evaluation for multi-label classification
     Nếu per_class_threshold=True, tìm threshold tốt nhất cho từng nhãn dựa trên F1-score
@@ -64,8 +73,10 @@ def evaluate_multi_label(model, dataloader, device, label_names, init_threshold=
     all_probs = torch.sigmoid(all_logits).numpy()      # probabilities
     y_true = all_labels.numpy()                        # ground truth
 
-    # Tìm threshold tốt nhất cho từng nhãn
-    if tune_threshold and per_class_threshold:
+    # Tìm threshold tốt nhất cho từng nhãn (không dùng test để tune)
+    if thresholds is not None:
+        best_thresholds = thresholds
+    elif tune_threshold and per_class_threshold:
         best_thresholds = find_best_thresholds_per_class(y_true, all_probs)
     else:
         best_thresholds = np.full(y_true.shape[1], init_threshold)
@@ -121,7 +132,7 @@ def print_evaluation_results(test_metrics, label_cols):
     print("\nPer-class breakdown:")
     for cls in label_cols:
         cls_metrics = test_metrics["per_class"].get(cls, {})
-        f1 = cls_metrics.get("f1", 0.0)
+        f1 = cls_metrics.get("f1-score", 0.0)
         prec = cls_metrics.get("precision", 0.0)
         rec = cls_metrics.get("recall", 0.0)
         support = cls_metrics.get("support", 0.0)
