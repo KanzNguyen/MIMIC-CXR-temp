@@ -101,14 +101,20 @@ def train_model(
 
     print(f"🚀 Starting medical feature extraction training")
     print(f"📊 Epochs: {num_epochs}, Patience: {patience}, Grad clip: {grad_clip}")
+
+    # Prepare loss functions with optional class imbalance weights on correct device
+    if pos_weight is not None:
+        pos_weight = pos_weight.to(device)
+    loss_fn_train = nn.BCEWithLogitsLoss(pos_weight=pos_weight) if pos_weight is not None else nn.BCEWithLogitsLoss()
+    loss_fn_val = nn.BCEWithLogitsLoss(pos_weight=pos_weight) if pos_weight is not None else nn.BCEWithLogitsLoss()
     
     for epoch in range(num_epochs):
         # Training với gradient clipping
-        train_loss = train_one_epoch_with_clip(model, train_loader, optimizer, device, grad_clip)
+        train_loss = train_one_epoch_with_clip(model, train_loader, optimizer, device, grad_clip, loss_fn=loss_fn_train)
         
         # Validation
-        # Use AUC-friendly validation if requested (threshold-free)
-        val_loss, val_f1 = evaluate(model, val_loader, device, loss_fn=nn.BCEWithLogitsLoss(pos_weight=pos_weight) if pos_weight is not None else None)
+        # Use validation loss (threshold-free) for early stopping/plateau scheduler
+        val_loss, val_f1 = evaluate(model, val_loader, device, loss_fn=loss_fn_val)
         
         # Update learning rate
         if scheduler:
