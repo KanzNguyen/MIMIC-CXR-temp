@@ -42,8 +42,9 @@ def main():
     state = torch.load(args.checkpoint, map_location=device)
     model.load_state_dict(state['model'])
     model.eval()
-
-    img_embs, txt_embs, labels = compute_embeddings(model, loader, device)
+    
+    with torch.no_grad():
+        img_embs, txt_embs, labels = compute_embeddings(model, loader, device)
 
     ret = retrieval_metrics(img_embs, txt_embs, ks=[1, 5, 10])
     print('Retrieval metrics:')

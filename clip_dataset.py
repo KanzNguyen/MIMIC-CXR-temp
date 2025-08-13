@@ -58,7 +58,8 @@ class MimicCxrClipDataset(Dataset):
         return len(self.df)
 
     def _load_image(self, rel_path: Optional[str]) -> Optional[Image.Image]:
-        if isinstance(rel_path, str) and len(rel_path) > 0 and rel_path != 'nan':
+        #if isinstance(rel_path, str) and len(rel_path) > 0 and rel_path != 'nan':
+        if isinstance(rel_path, str) and rel_path.strip():
             img_path = rel_path
             if not os.path.isabs(img_path):
                 img_path = os.path.join(self.base_path, rel_path)

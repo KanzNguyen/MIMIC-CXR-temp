@@ -45,6 +45,11 @@ class ClipDualView(nn.Module):
             img = (img_f + img_l) * 0.5
             img = l2_normalize(img)
             return img
+        elif self.fuse_type == 'norm_sum':
+            img_f = l2_normalize(img_f)
+            img_l = l2_normalize(img_l)
+            fused = l2_normalize(img_f + img_l)
+            return fused
         else:  # concat
             fused = torch.cat([img_f, img_l], dim=-1)
             fused = self.fuse_proj(fused)
