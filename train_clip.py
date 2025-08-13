@@ -63,7 +63,7 @@ def parse_args():
     parser.add_argument('--csv_path', type=str, default=None, help='CSV file path; if None uses base_path/mimic_cxr_aug_train.csv')
     parser.add_argument('--model_name', type=str, default='ViT-B-16', choices=['ViT-B-16', 'RN50'])
     parser.add_argument('--pretrained', type=str, default='openai')
-    parser.add_argument('--fuse_type', type=str, default='avg', choices=['avg', 'concat'])
+    parser.add_argument('--fuse_type', type=str, default='avg', choices=['avg', 'concat', 'norm_sum'])
     parser.add_argument('--text_ctx_len', type=int, default=256)
     parser.add_argument('--batch_size', type=int, default=128)
     parser.add_argument('--num_workers', type=int, default=4)
